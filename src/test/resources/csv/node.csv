@@ -1,0 +1,4 @@
+id;name;refined.id;mode;uiClasses;tag;tagUiClasses
+service:registry;Source;;LINK;fas fa-code-branch;technical;fa fa-industry
+service:registry:artifactory;artifactory;service:registry;LINK;;;
+service:registry:artifactory:dig;artifactory DIG;service:registry:artifactory;LINK;;;
