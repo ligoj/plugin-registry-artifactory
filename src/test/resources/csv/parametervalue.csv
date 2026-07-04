@@ -1,0 +1,6 @@
+parameter.id;data;node.id;subscription.id!
+service:registry:artifactory:url;http://localhost:8120;service:registry:artifactory:dig;
+service:registry:artifactory:user;junit;service:registry:artifactory:dig;
+service:registry:artifactory:password;secret;service:registry:artifactory:dig;
+service:registry:artifactory:type;maven;;1
+service:registry:artifactory:registry;libs-release-local;;1

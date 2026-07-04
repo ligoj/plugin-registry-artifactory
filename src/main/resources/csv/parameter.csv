@@ -1,0 +1,6 @@
+id;owner.id;data;mandatory;type;mode;secured;defaultValue;availableForSubscription;availableForNode
+service:registry:artifactory:url;service:registry:artifactory;;true;TEXT;;;;FALSE;
+service:registry:artifactory:user;service:registry:artifactory;;true;TEXT;;;;FALSE;
+service:registry:artifactory:password;service:registry:artifactory;;true;TEXT;;true;;FALSE;
+service:registry:artifactory:type;service:registry:artifactory;["docker","maven","nuget","npm","python"];true;SELECT;;;;;FALSE
+service:registry:artifactory:registry;service:registry:artifactory;;true;TEXT;;;;;FALSE

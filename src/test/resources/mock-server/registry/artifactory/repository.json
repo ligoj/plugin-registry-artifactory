@@ -1,0 +1,7 @@
+{
+  "key": "libs-release-local",
+  "packageType": "maven",
+  "rclass": "local",
+  "type": "LOCAL",
+  "url": "http://localhost:8120/artifactory/libs-release-local"
+}

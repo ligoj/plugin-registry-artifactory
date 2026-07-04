@@ -1,0 +1,14 @@
+[
+  {
+    "key": "libs-release-local",
+    "type": "LOCAL",
+    "packageType": "maven",
+    "url": "http://localhost:8120/artifactory/libs-release-local"
+  },
+  {
+    "key": "docker-local",
+    "type": "LOCAL",
+    "packageType": "docker",
+    "url": "http://localhost:8120/artifactory/docker-local"
+  }
+]
