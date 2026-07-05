@@ -1,0 +1,32 @@
+{
+  "repositoriesSummaryList": [
+    {
+      "repoKey": "libs-release-local",
+      "repoType": "LOCAL",
+      "foldersCount": 27,
+      "filesCount": 123,
+      "itemsCount": 150,
+      "usedSpace": "1.2 GB",
+      "packageType": "Maven",
+      "percentage": "60%"
+    },
+    {
+      "repoKey": "docker-local",
+      "repoType": "LOCAL",
+      "foldersCount": 5,
+      "filesCount": 42,
+      "itemsCount": 47,
+      "usedSpace": "800 MB",
+      "packageType": "Docker",
+      "percentage": "40%"
+    },
+    {
+      "repoKey": "TOTAL",
+      "repoType": "NA",
+      "filesCount": 165,
+      "itemsCount": 197,
+      "usedSpace": "2 GB",
+      "percentage": "100%"
+    }
+  ]
+}

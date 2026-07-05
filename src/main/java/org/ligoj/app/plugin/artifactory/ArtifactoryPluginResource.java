@@ -15,6 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.ligoj.app.api.SubscriptionStatusWithData;
 import org.ligoj.app.plugin.artifactory.client.ArtifactoryRepository;
+import org.ligoj.app.plugin.artifactory.client.ArtifactoryStorageInfo;
 import org.ligoj.app.plugin.registry.RegistryResource;
 import org.ligoj.app.plugin.registry.RegistryServicePlugin;
 import org.ligoj.app.resource.NormalizeFormat;
@@ -169,7 +170,37 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 		status.put("format", repository.getPackageType());
 		// 'rclass' comes from the Pro single-repository endpoint; the OSS listing exposes 'type'.
 		status.put("type", StringUtils.defaultIfBlank(repository.getRclass(), repository.getType()));
+		addStorageStats(status, parameters, parameters.get(PARAMETER_REGISTRY));
 		return status;
+	}
+
+	/**
+	 * Add the file count and used space of the target repository, read from the
+	 * storage summary. Best-effort: when the endpoint is unavailable (missing
+	 * privilege, older server) or the repository is absent from the summary, no
+	 * statistic is added.
+	 *
+	 * @param status     The status to enrich.
+	 * @param parameters The node/subscription parameters.
+	 * @param registry   The repository key.
+	 * @throws IOException When the Artifactory response cannot be read.
+	 */
+	private void addStorageStats(final SubscriptionStatusWithData status, final Map<String, String> parameters,
+			final String registry) throws IOException {
+		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/storageinfo", null);
+		request.setSaveResponse(true);
+		final boolean found;
+		try (var processor = newProcessor(parameters)) {
+			found = processor.process(request);
+		}
+		if (found) {
+			objectMapper.readValue(StringUtils.defaultIfBlank(request.getResponse(), "{}"), ArtifactoryStorageInfo.class)
+					.getRepositoriesSummaryList().stream().filter(s -> registry.equals(s.getRepoKey())).findFirst()
+					.ifPresent(summary -> {
+						status.put("files", summary.getFilesCount());
+						status.put("size", summary.getUsedSpace());
+					});
+		}
 	}
 
 	/**
