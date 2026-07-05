@@ -9,6 +9,7 @@ import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 import org.apache.commons.lang3.StringUtils;
@@ -77,6 +78,12 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	 * Target repository/registry (subscription level).
 	 */
 	public static final String PARAMETER_REGISTRY = KEY + ":registry";
+
+	/**
+	 * UI artifact type → Artifactory package type, for the ones Artifactory names
+	 * differently. Types not listed match (case-insensitively) their own name.
+	 */
+	private static final Map<String, String> UI_TYPE_TO_PACKAGE = Map.of("python", "pypi");
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -208,21 +215,36 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	 *
 	 * @param node     The node identifier holding the registry parameters.
 	 * @param criteria The search criteria.
+	 * @param type     Optional artifact type (docker, maven, npm, …) to filter the
+	 *                 repositories by their Artifactory package type. When blank,
+	 *                 all package types match.
 	 * @return The matching repository keys.
 	 * @throws IOException When the Artifactory response cannot be read.
 	 */
 	@GET
 	@Path("{node}/{criteria}")
 	public List<NamedBean<String>> findAllByName(@PathParam("node") final String node,
-			@PathParam("criteria") final String criteria) throws IOException {
+			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) throws IOException {
 		final var parameters = pvResource.getNodeParameters(node);
 		final var format = new NormalizeFormat();
 		final var formatCriteria = format.format(criteria);
+		final var wantedPackage = toPackageType(type);
 		return inMemoryPagination
 				.newPage(listRepositories(parameters).stream()
 						.filter(r -> format.format(r.getKey()).contains(formatCriteria))
+						.filter(r -> wantedPackage == null || wantedPackage.equalsIgnoreCase(r.getPackageType()))
 						.map(r -> new NamedBean<>(r.getKey(), r.getKey())).toList(), PageRequest.of(0, 10))
 				.getContent();
+	}
+
+	/**
+	 * Map a UI artifact type to the Artifactory package type. Artifactory names
+	 * python repositories <code>PyPi</code>; the rest match (case-insensitively)
+	 * their own name. A blank type (no filter) yields <code>null</code>.
+	 */
+	private String toPackageType(final String type) {
+		final var t = StringUtils.trimToNull(type);
+		return t == null ? null : UI_TYPE_TO_PACKAGE.getOrDefault(t.toLowerCase(), t.toLowerCase());
 	}
 
 }

@@ -10,7 +10,11 @@ import { pluginRegistry, useI18nStore } from '@ligoj/host'
 import def from '../index.js'
 import parentDef from '../../../../plugin-registry/ui/src/index.js'
 
-beforeEach(() => { setActivePinia(createPinia()) })
+// The type icon in the chip is the shared RegistryTypeIcon, drawn by the parent
+// plugin-registry via its `renderTypeIcon` feature — register the parent so the
+// tool can resolve it (as at runtime, where the parent is always loaded).
+beforeEach(() => { setActivePinia(createPinia()); pluginRegistry.register('registry', parentDef) })
+afterEach(() => { pluginRegistry.remove('registry') })
 
 /** Extract the mdi icon name from a renderServiceLink (VBtn) or renderDetailsChip (VChip) vnode. */
 function iconOf(vnode) {
@@ -22,9 +26,11 @@ function iconOf(vnode) {
 // renderDetailsKey now returns a VTooltip wrapping a chip activator.
 const chipOf = (tooltip) => tooltip.children.activator({ props: {} })
 const linesOf = (tooltip) => tooltip.children.default()
-const chipIcon = (chip) => chip.children.default()[0].children.default()
 const chipText = (chip) => { const k = chip.children.default(); return k[k.length - 1] }
-const vIcon = (iconVNode) => iconVNode.children.default()
+// The type icon is the shared RegistryTypeIcon; assert the artifact `type` handed
+// to it (the type→mdi mapping is verified in plugin-registry's own tests).
+const chipType = (chip) => chip.children.default()[0].props.type
+const lineType = (iconVNode) => iconVNode.props.type
 
 describe('plugin-registry-artifactory manifest', () => {
   it('exposes a valid tool-level manifest', () => {
@@ -78,12 +84,12 @@ describe('plugin-registry-artifactory manifest', () => {
     const maven = def.feature('renderDetailsKey', { parameters: { 'service:registry:artifactory:registry': 'libs-release-local', 'service:registry:artifactory:type': 'maven' } })
     expect(maven.__v_isVNode).toBe(true)
     const chip = chipOf(maven)
-    expect(chipIcon(chip)).toBe('mdi-language-java')
+    expect(chipType(chip)).toBe('maven')
     expect(chipText(chip)).toBe('libs-release-local')
     const lines = linesOf(maven)
     expect(lines).toHaveLength(2)
     expect(lines[0].children[1]).toBe('maven')
-    expect(vIcon(lines[0].children[0])).toBe('mdi-language-java')
+    expect(lineType(lines[0].children[0])).toBe('maven')
     expect(lines[1].children).toBe('libs-release-local')
   })
 
@@ -91,21 +97,32 @@ describe('plugin-registry-artifactory manifest', () => {
     def.install()
     // 0=docker, 1=maven, ...
     const docker = def.feature('renderDetailsKey', { parameters: { 'service:registry:artifactory:registry': 'docker-local', 'service:registry:artifactory:type': '0' } })
-    expect(chipIcon(chipOf(docker))).toBe('mdi-docker')
+    expect(chipType(chipOf(docker))).toBe('docker')
     expect(linesOf(docker)[0].children[1]).toBe('docker')
     const maven = def.feature('renderDetailsKey', { parameters: { 'service:registry:artifactory:registry': 'libs', 'service:registry:artifactory:type': '1' } })
-    expect(chipIcon(chipOf(maven))).toBe('mdi-language-java')
+    expect(chipType(chipOf(maven))).toBe('maven')
   })
 
-  it('renderDetailsKey falls back to a generic icon + single-line tooltip when the type is unknown/absent', () => {
+  it('renderDetailsKey passes an unknown/absent type through, with a single-line tooltip when absent', () => {
     def.install()
     const unknown = def.feature('renderDetailsKey', { parameters: { 'service:registry:artifactory:registry': 'r', 'service:registry:artifactory:type': 'rust' } })
-    expect(chipIcon(chipOf(unknown))).toBe('mdi-package-variant')
+    expect(chipType(chipOf(unknown))).toBe('rust')
     const noType = def.feature('renderDetailsKey', { parameters: { 'service:registry:artifactory:registry': 'r' } })
-    expect(chipIcon(chipOf(noType))).toBe('mdi-package-variant')
+    expect(chipType(chipOf(noType))).toBe('')  // no type → empty string handed to the shared icon
     const lines = linesOf(noType)
     expect(lines).toHaveLength(1)
     expect(lines[0].children).toBe('r')
+  })
+
+  it('renderDetailsKey renders a generic package icon when the parent cannot provide one', () => {
+    def.install()
+    const params = { 'service:registry:artifactory:registry': 'r', 'service:registry:artifactory:type': 'maven' }
+    const iconName = (tooltip) => chipOf(tooltip).children.default()[0].children.default()
+    pluginRegistry.remove('registry')  // parent not loaded
+    expect(iconName(def.feature('renderDetailsKey', { parameters: params }))).toBe('mdi-package-variant')
+    // older parent bundle without the renderTypeIcon feature (feature() throws)
+    pluginRegistry.register('registry', { id: 'registry', feature: () => { throw new Error('no feature "renderTypeIcon"') } })
+    expect(iconName(def.feature('renderDetailsKey', { parameters: params }))).toBe('mdi-package-variant')
   })
 
   it('renderDetailsKey returns null without a registry', () => {

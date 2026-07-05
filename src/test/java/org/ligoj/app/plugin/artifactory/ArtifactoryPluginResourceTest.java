@@ -173,16 +173,30 @@ class ArtifactoryPluginResourceTest extends AbstractServerTest {
 	@Test
 	void findAllByName() throws IOException {
 		prepareMockRepositories();
-		final var repositories = resource.findAllByName("service:registry:artifactory:dig", "libs");
+		final var repositories = resource.findAllByName("service:registry:artifactory:dig", "libs", null);
 		Assertions.assertEquals(1, repositories.size());
 		Assertions.assertEquals("libs-release-local", repositories.getFirst().getId());
 		Assertions.assertEquals("libs-release-local", repositories.getFirst().getName());
 	}
 
 	@Test
+	void findAllByNameFilteredByType() throws IOException {
+		prepareMockRepositories();
+		// "local" matches both mock repositories (libs-release-local, docker-local)
+		// by key; the artifact type then narrows to a single package type.
+		Assertions.assertEquals(2, resource.findAllByName("service:registry:artifactory:dig", "local", null).size());
+		final var maven = resource.findAllByName("service:registry:artifactory:dig", "local", "maven");
+		Assertions.assertEquals(1, maven.size());
+		Assertions.assertEquals("libs-release-local", maven.getFirst().getName());
+		final var docker = resource.findAllByName("service:registry:artifactory:dig", "local", "docker");
+		Assertions.assertEquals(1, docker.size());
+		Assertions.assertEquals("docker-local", docker.getFirst().getName());
+	}
+
+	@Test
 	void findAllByNameNoListing() throws IOException {
 		httpServer.start();
-		final var repositories = resource.findAllByName("service:registry:artifactory:dig", "libs");
+		final var repositories = resource.findAllByName("service:registry:artifactory:dig", "libs", null);
 		Assertions.assertEquals(0, repositories.size());
 	}
 
