@@ -1,7 +1,6 @@
 package org.ligoj.app.plugin.artifactory;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -117,6 +116,10 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	/**
 	 * Validate the subscription registry (the Artifactory repository) and return
 	 * it. Throws when the repository cannot be resolved.
+	 * <p>
+	 * The rich single-repository endpoint ({@code /api/repositories/<key>}) is only available in
+	 * Artifactory Pro (it answers HTTP 400 on OSS). When it does not resolve, the repository is
+	 * instead looked up in the repository listing, which is available in OSS too.
 	 */
 	private ArtifactoryRepository validateRegistry(final Map<String, String> parameters) throws IOException {
 		final var registry = parameters.get(PARAMETER_REGISTRY);
@@ -127,10 +130,31 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 		try (var processor = newProcessor(parameters)) {
 			found = processor.process(request);
 		}
-		if (!found || StringUtils.isBlank(request.getResponse())) {
-			throw new ValidationJsonException(PARAMETER_REGISTRY, "artifactory-registry", registry);
+		if (found && StringUtils.isNotBlank(request.getResponse())) {
+			return objectMapper.readValue(request.getResponse(), ArtifactoryRepository.class);
 		}
-		return objectMapper.readValue(request.getResponse(), ArtifactoryRepository.class);
+		// OSS fallback: the single-repository endpoint is Pro-only, but the listing is not.
+		return listRepositories(parameters).stream().filter(r -> registry.equals(r.getKey())).findFirst()
+				.orElseThrow(() -> new ValidationJsonException(PARAMETER_REGISTRY, "artifactory-registry", registry));
+	}
+
+	/**
+	 * List the repositories exposed by the node using the OSS-compatible listing endpoint.
+	 */
+	private List<ArtifactoryRepository> listRepositories(final Map<String, String> parameters) throws IOException {
+		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/repositories", null);
+		request.setSaveResponse(true);
+		final boolean found;
+		try (var processor = newProcessor(parameters)) {
+			found = processor.process(request);
+		}
+		if (!found) {
+			return List.of();
+		}
+		return objectMapper.readValue(StringUtils.defaultIfBlank(request.getResponse(), "[]"),
+				new TypeReference<List<ArtifactoryRepository>>() {
+					// Nothing to extend
+				});
 	}
 
 	@Override
@@ -143,7 +167,8 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 		final var status = new SubscriptionStatusWithData();
 		final var repository = validateRegistry(parameters);
 		status.put("format", repository.getPackageType());
-		status.put("type", repository.getRclass());
+		// 'rclass' comes from the Pro single-repository endpoint; the OSS listing exposes 'type'.
+		status.put("type", StringUtils.defaultIfBlank(repository.getRclass(), repository.getType()));
 		return status;
 	}
 
@@ -160,26 +185,13 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	public List<NamedBean<String>> findAllByName(@PathParam("node") final String node,
 			@PathParam("criteria") final String criteria) throws IOException {
 		final var parameters = pvResource.getNodeParameters(node);
-		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/repositories", null);
-		request.setSaveResponse(true);
-		final boolean found;
-		try (var processor = newProcessor(parameters)) {
-			found = processor.process(request);
-		}
-		if (found) {
-			final List<ArtifactoryRepository> repositories = objectMapper.readValue(
-					StringUtils.defaultIfBlank(request.getResponse(), "[]"),
-					new TypeReference<List<ArtifactoryRepository>>() {
-						// Nothing to extend
-					});
-			final var format = new NormalizeFormat();
-			final var formatCriteria = format.format(criteria);
-			return inMemoryPagination
-					.newPage(repositories.stream().filter(r -> format.format(r.getKey()).contains(formatCriteria))
-							.map(r -> new NamedBean<>(r.getKey(), r.getKey())).toList(), PageRequest.of(0, 10))
-					.getContent();
-		}
-		return Collections.emptyList();
+		final var format = new NormalizeFormat();
+		final var formatCriteria = format.format(criteria);
+		return inMemoryPagination
+				.newPage(listRepositories(parameters).stream()
+						.filter(r -> format.format(r.getKey()).contains(formatCriteria))
+						.map(r -> new NamedBean<>(r.getKey(), r.getKey())).toList(), PageRequest.of(0, 10))
+				.getContent();
 	}
 
 }

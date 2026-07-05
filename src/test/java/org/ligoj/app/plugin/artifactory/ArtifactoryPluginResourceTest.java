@@ -120,6 +120,29 @@ class ArtifactoryPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
+	void linkFromListing() throws Exception {
+		// Artifactory OSS: the single-repository endpoint is Pro-only (HTTP 400), so the repository
+		// must be resolved from the (OSS-compatible) listing instead.
+		httpServer.stubFor(get(urlPathEqualTo("/api/repositories/libs-release-local"))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_BAD_REQUEST)));
+		prepareMockRepositories();
+		resource.link(this.subscription);
+		// Nothing to validate but the absence of exception
+	}
+
+	@Test
+	void checkSubscriptionStatusFromListing() throws IOException {
+		// OSS path: 'type' falls back to the listing value ('LOCAL') since 'rclass' is Pro-only.
+		httpServer.stubFor(get(urlPathEqualTo("/api/repositories/libs-release-local"))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_BAD_REQUEST)));
+		prepareMockRepositories();
+		final var status = resource.checkSubscriptionStatus(subscriptionResource.getParametersNoCheck(subscription));
+		Assertions.assertTrue(status.getStatus().isUp());
+		Assertions.assertEquals("maven", status.getData().get("format"));
+		Assertions.assertEquals("LOCAL", status.getData().get("type"));
+	}
+
+	@Test
 	void checkSubscriptionStatus() throws IOException {
 		prepareMockRepository();
 		final var status = resource.checkSubscriptionStatus(subscriptionResource.getParametersNoCheck(subscription));
