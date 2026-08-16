@@ -1,17 +1,7 @@
 package org.ligoj.app.plugin.artifactory;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.HttpMethod;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.ligoj.app.api.SubscriptionStatusWithData;
@@ -30,9 +20,13 @@ import org.ligoj.bootstrap.core.validation.ValidationJsonException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
 
 /**
  * JFrog Artifactory registry resource. Artifactory is multi-format, so the
@@ -55,7 +49,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 
 	/**
 	 * Artifactory base URL (node validation), e.g.
-	 * <code>https://acme.jfrog.io/artifactory</code>.
+	 * <code><a href="https://acme.jfrog.io/artifactory">...</a></code>.
 	 */
 	public static final String PARAMETER_URL = KEY + ":url";
 
@@ -114,7 +108,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 
 	@Override
 	public boolean checkStatus(final Map<String, String> parameters) {
-		// Node validation: authenticated call to the repositories endpoint.
+		// Node validation: authenticated call to the repositories' endpoint.
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/repositories", null);
 		try (var processor = newProcessor(parameters)) {
 			return processor.process(request);
@@ -129,7 +123,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	 * Artifactory Pro (it answers HTTP 400 on OSS). When it does not resolve, the repository is
 	 * instead looked up in the repository listing, which is available in OSS too.
 	 */
-	private ArtifactoryRepository validateRegistry(final Map<String, String> parameters) throws IOException {
+	private ArtifactoryRepository validateRegistry(final Map<String, String> parameters) {
 		final var registry = parameters.get(PARAMETER_REGISTRY);
 		final var request = new CurlRequest(HttpMethod.GET,
 				getBaseUrl(parameters) + "/api/repositories/" + registry, null);
@@ -149,7 +143,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	/**
 	 * List the repositories exposed by the node using the OSS-compatible listing endpoint.
 	 */
-	private List<ArtifactoryRepository> listRepositories(final Map<String, String> parameters) throws IOException {
+	private List<ArtifactoryRepository> listRepositories(final Map<String, String> parameters) {
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/repositories", null);
 		request.setSaveResponse(true);
 		final boolean found;
@@ -160,7 +154,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 			return List.of();
 		}
 		return objectMapper.readValue(StringUtils.defaultIfBlank(request.getResponse(), "[]"),
-				new TypeReference<List<ArtifactoryRepository>>() {
+				new TypeReference<>() {
 					// Nothing to extend
 				});
 	}
@@ -171,7 +165,7 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	}
 
 	@Override
-	public SubscriptionStatusWithData checkSubscriptionStatus(final Map<String, String> parameters) throws IOException {
+	public SubscriptionStatusWithData checkSubscriptionStatus(final Map<String, String> parameters) {
 		final var status = new SubscriptionStatusWithData();
 		final var repository = validateRegistry(parameters);
 		status.put("format", repository.getPackageType());
@@ -190,10 +184,9 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	 * @param status     The status to enrich.
 	 * @param parameters The node/subscription parameters.
 	 * @param registry   The repository key.
-	 * @throws IOException When the Artifactory response cannot be read.
 	 */
 	private void addStorageStats(final SubscriptionStatusWithData status, final Map<String, String> parameters,
-			final String registry) throws IOException {
+			final String registry) {
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/api/storageinfo", null);
 		request.setSaveResponse(true);
 		final boolean found;
@@ -219,12 +212,11 @@ public class ArtifactoryPluginResource extends AbstractToolPluginResource implem
 	 *                 repositories by their Artifactory package type. When blank,
 	 *                 all package types match.
 	 * @return The matching repository keys.
-	 * @throws IOException When the Artifactory response cannot be read.
 	 */
 	@GET
 	@Path("{node}/{criteria}")
 	public List<NamedBean<String>> findAllByName(@PathParam("node") final String node,
-			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) throws IOException {
+			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) {
 		final var parameters = pvResource.getNodeParameters(node);
 		final var format = new NormalizeFormat();
 		final var formatCriteria = format.format(criteria);

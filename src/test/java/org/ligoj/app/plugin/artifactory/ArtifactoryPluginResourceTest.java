@@ -50,7 +50,7 @@ class ArtifactoryPluginResourceTest extends AbstractServerTest {
 	@BeforeEach
 	void prepareData() throws IOException {
 		persistEntities("csv",
-				new Class<?>[] { Node.class, Parameter.class, Project.class, Subscription.class, ParameterValue.class },
+				new Class<?>[]{Node.class, Parameter.class, Project.class, Subscription.class, ParameterValue.class},
 				StandardCharsets.UTF_8);
 		this.subscription = getSubscription("Jupiter", ArtifactoryPluginResource.KEY);
 
@@ -77,7 +77,7 @@ class ArtifactoryPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
-	void checkStatus() throws Exception {
+	void checkStatus() {
 		httpServer.stubFor(get(urlPathEqualTo("/api/repositories"))
 				.willReturn(aResponse().withStatus(HttpStatus.SC_OK).withBody("[]")));
 		httpServer.start();
@@ -194,7 +194,7 @@ class ArtifactoryPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
-	void findAllByNameNoListing() throws IOException {
+	void findAllByNameNoListing() {
 		httpServer.start();
 		final var repositories = resource.findAllByName("service:registry:artifactory:dig", "libs", null);
 		Assertions.assertEquals(0, repositories.size());
